@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Buyer Dashboard</h2>
+<h3>Recent Orders</h3>
+<ul>
+    {% for order in recent_orders %}
+    <li><a href="{% url 'order_detail' order.id %}">Order {{ order.id }}</a> - Status: {{ order.get_order_status_display }}</li>
+    {% empty %}
+    <li>No recent orders.</li>
+    {% endfor %}
+</ul>
+<h3>Wishlist</h3>
+<ul>
+    {% for item in wishlist_items %}
+    <li>{{ item.product.material.material_name }}</li>
+    {% empty %}
+    <li>Your wishlist is empty.</li>
+    {% endfor %}
+</ul>
+<h3>Cart</h3>
+<ul>
+    {% for item in cart_items %}
+    <li>{{ item.product.material.material_name }} - Quantity: {{ item.quantity }}</li>
+    {% empty %}
+    <li>Your cart is empty.</li>
+    {% endfor %}
+</ul>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Admin Dashboard</h2>
+<h3>Recent Users</h3>
+<ul>
+    {% for user in recent_users %}
+    <li>{{ user.username }} - Joined: {{ user.date_joined }}</li>
+    {% empty %}
+    <li>No recent users.</li>
+    {% endfor %}
+</ul>
+<h3>Recent Orders</h3>
+<ul>
+    {% for order in recent_orders %}
+    <li><a href="{% url 'order_detail' order.id %}">Order {{ order.id }}</a> - Status: {{ order.get_order_status_display }}</li>
+    {% empty %}
+    <li>No recent orders.</li>
+    {% endfor %}
+</ul>
+<h3>Total Sales</h3>
+<p>{{ total_sales }}</p>
+{% endblock %}

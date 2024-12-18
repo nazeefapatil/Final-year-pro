@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Your Wishlist</h2>
+<ul>
+    {% for item in wishlist_items %}
+    <li>
+        {{ item.product.material.material_name }}
+        <form method="post" action="{% url 'remove_from_wishlist' item.id %}">
+            {% csrf_token %}
+            <button type="submit">Remove</button>
+        </form>
+    </li>
+    {% empty %}
+    <li>Your wishlist is empty.</li>
+    {% endfor %}
+</ul>
+{% endblock %}

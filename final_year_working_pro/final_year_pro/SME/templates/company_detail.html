@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>{{ company.company_name }}</h2>
+<p>Email: {{ company.email }}</p>
+<p>Phone: {{ company.phone }}</p>
+<p>Address: {{ company.address }}</p>
+<p>Country: {{ company.country }}</p>
+<p>Website: <a href="{{ company.website }}">{{ company.website }}</a></p>
+{% endblock %}

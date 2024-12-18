@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Seller Dashboard</h2>
+<h3>Recent Orders</h3>
+<ul>
+    {% for order in recent_orders %}
+    <li><a href="{% url 'order_detail' order.id %}">Order {{ order.id }}</a> - Status: {{ order.get_order_status_display }}</li>
+    {% empty %}
+    <li>No recent orders.</li>
+    {% endfor %}
+</ul>
+<h3>Top Products</h3>
+<ul>
+    {% for product in top_products %}
+    <li>{{ product.material.material_name }} - Total Ordered: {{ product.total_ordered }}</li>
+    {% empty %}
+    <li>No products sold yet.</li>
+    {% endfor %}
+</ul>
+{% endblock %}

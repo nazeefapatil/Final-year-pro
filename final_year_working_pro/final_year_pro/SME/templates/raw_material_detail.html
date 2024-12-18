@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>{{ material.material_name }}</h2>
+<p>Description: {{ material.description }}</p>
+<p>Typical Uses: {{ material.typical_uses }}</p>
+{% if material.image %}
+<img src="{{ material.image.url }}" alt="{{ material.material_name }}">
+{% endif %}
+{% endblock %}

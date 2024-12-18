@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Supplier Dashboard</h2>
+<h3>Recent Products</h3>
+<ul>
+    {% for product in recent_products %}
+    <li>{{ product.material.material_name }} - Available from: {{ product.available_from }}</li>
+    {% empty %}
+    <li>No recent products.</li>
+    {% endfor %}
+</ul>
+{% endblock %}

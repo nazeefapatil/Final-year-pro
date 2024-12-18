@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Buyer-Seller Matches</h2>
+<ul>
+    {% for match in matches %}
+    <li>
+        <a href="{% url 'buyer_seller_match_detail' match.id %}">
+            {{ match.buyer_requirement.company.company_name }} ↔ {{ match.seller_product.seller.company.company_name }}
+        </a>
+    </li>
+    {% empty %}
+    <li>No matches found.</li>
+    {% endfor %}
+</ul>
+{% include 'pagination.html' %}
+{% endblock %}

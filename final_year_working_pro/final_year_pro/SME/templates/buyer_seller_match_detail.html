@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Buyer-Seller Match Details</h2>
+<p>Buyer: {{ match.buyer_requirement.company.company_name }}</p>
+<p>Seller: {{ match.seller_product.seller.company.company_name }}</p>
+<p>Material: {{ match.seller_product.material.material_name }}</p>
+<p>Match Date: {{ match.match_date }}</p>
+<a href="{% url 'buyer_seller_match_update' match.id %}">Edit</a>
+<form method="post" action="{% url 'buyer_seller_match_delete' match.id %}">
+    {% csrf_token %}
+    <button type="submit">Delete</button>
+</form>
+{% endblock %}
