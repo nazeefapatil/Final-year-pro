@@ -5,6 +5,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from simple_history.models import HistoricalRecords
 import uuid
+from django.utils import timezone
 
 
 class User(AbstractUser):
@@ -306,13 +307,12 @@ class SupplierReview(models.Model):
 @receiver(post_save, sender=User)
 def create_profile(sender, instance, created, **kwargs):
     """
-    Automatically create seller or supplier profile when a user is created
+    Signal handler for user creation.
+    Note: Seller and Supplier profiles are created in the signup view
+    to properly handle company creation.
     """
-    if created:
-        if instance.role == 'seller':
-            SellerProfile.objects.create(user=instance)
-        elif instance.role == 'supplier':
-            SupplierProfile.objects.create(user=instance)
+    # Signal handler is now empty as profiles are created in the signup view
+    pass
 
 class CommunicationMethod(models.TextChoices):
     """
@@ -463,3 +463,49 @@ class UserCommunicationPreference(models.Model):
 
     def __str__(self):
         return f"{self.user.username}'s Communication Preferences"
+
+
+@receiver(post_save, sender=CompanyRequirement)
+def create_matches_for_requirement(sender, instance, created, **kwargs):
+    """
+    Signal handler to automatically create matches when a new requirement is added
+    or when an existing requirement is updated.
+    """
+    # Delete existing matches for this requirement to prevent duplicates
+    BuyerSellerMatch.objects.filter(buyer_requirement=instance).delete()
+    
+    # Find matching seller products
+    matching_products = SellerProduct.objects.filter(
+        material=instance.material,
+        quantity_available__gte=instance.quantity_required,
+        available_until__gte=timezone.now().date()
+    )
+    
+    # Create matches for each matching product
+    for product in matching_products:
+        BuyerSellerMatch.objects.create(
+            buyer_requirement=instance,
+            seller_product=product
+        )
+
+@receiver(post_save, sender=SellerProduct)
+def create_matches_for_product(sender, instance, created, **kwargs):
+    """
+    Signal handler to automatically create matches when a new product is added
+    or when an existing product is updated.
+    """
+    # Delete existing matches for this product to prevent duplicates
+    BuyerSellerMatch.objects.filter(seller_product=instance).delete()
+    
+    # Find matching requirements
+    matching_requirements = CompanyRequirement.objects.filter(
+        material=instance.material,
+        quantity_required__lte=instance.quantity_available
+    )
+    
+    # Create matches for each matching requirement
+    for requirement in matching_requirements:
+        BuyerSellerMatch.objects.create(
+            buyer_requirement=requirement,
+            seller_product=instance
+        )

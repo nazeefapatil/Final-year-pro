@@ -3,33 +3,114 @@
 {% block title %}User Profile{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <h2 class="mb-4">User Profile</h2>
-        <form method="post" enctype="multipart/form-data">
-            {% csrf_token %}
-            
-            {% for field in form %}
-                <div class="mb-3">
-                    <label for="{{ field.id_for_label }}" class="form-label">
-                        {{ field.label }}
-                    </label>
-                    {{ field }}
-                    {% if field.help_text %}
-                        <small class="form-text text-muted">{{ field.help_text }}</small>
-                    {% endif %}
-                    {% if field.errors %}
-                        <div class="text-danger">
-                            {% for error in field.errors %}
-                                {{ error }}
-                            {% endfor %}
-                        </div>
-                    {% endif %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-lg border-0 rounded-lg">
+                <div class="card-header bg-gradient-primary text-white text-center py-4">
+                    <h2 class="font-weight-bold mb-0">User Profile</h2>
                 </div>
-            {% endfor %}
+                
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        {% if user.profile_picture %}
+                            <div class="position-relative d-inline-block">
+                                <img src="{{ user.profile_picture.url }}" alt="Profile Photo" 
+                                     class="rounded-circle border border-3 border-primary shadow-sm" 
+                                     style="width: 180px; height: 180px; object-fit: cover;">
+                                <div class="position-absolute bottom-0 end-0">
+                                    <span class="badge rounded-pill bg-primary">
+                                        <i class="fas fa-camera"></i>
+                                    </span>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="profile-placeholder rounded-circle bg-light d-flex align-items-center justify-content-center"
+                                 style="width: 180px; height: 180px; margin: 0 auto;">
+                                <i class="fas fa-user fa-4x text-secondary"></i>
+                            </div>
+                        {% endif %}
+                    </div>
 
-            <button type="submit" class="btn btn-primary">Update Profile</button>
-        </form>
+                    <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+                        {% csrf_token %}
+                        
+                        {% for field in form %}
+                            <div class="mb-4">
+                                {% if field.name == 'profile_picture' %}
+                                    <div class="upload-photo-container">
+                                        <label for="{{ field.id_for_label }}" class="form-label fw-bold">
+                                            <i class="fas fa-camera me-2"></i>{{ field.label }}
+                                        </label>
+                                        <div class="input-group">
+                                            {{ field }}
+                                            <label for="{{ field.id_for_label }}" class="input-group-text btn btn-outline-primary">
+                                                Browse
+                                            </label>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <label for="{{ field.id_for_label }}" class="form-label fw-bold">
+                                        {{ field.label }}
+                                    </label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">
+                                            <i class="fas fa-{% if field.name == 'email' %}envelope{% elif field.name == 'username' %}user{% else %}pencil{% endif %}"></i>
+                                        </span>
+                                        {{ field }}
+                                    </div>
+                                {% endif %}
+                                
+                                {% if field.help_text %}
+                                    <div class="form-text text-muted">
+                                        <i class="fas fa-info-circle me-1"></i>{{ field.help_text }}
+                                    </div>
+                                {% endif %}
+                                
+                                {% if field.errors %}
+                                    <div class="alert alert-danger mt-2 py-2">
+                                        {% for error in field.errors %}
+                                            <div><i class="fas fa-exclamation-circle me-2"></i>{{ error }}</div>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-save me-2"></i>Update Profile
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
+
+<style>
+.bg-gradient-primary {
+    background: linear-gradient(45deg, #4e73df 0%, #224abe 100%);
+}
+
+.form-control:focus {
+    border-color: #4e73df;
+    box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25);
+}
+
+.upload-photo-container input[type="file"] {
+    opacity: 0;
+    position: absolute;
+    z-index: -1;
+}
+
+.card {
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+</style>
 {% endblock %}

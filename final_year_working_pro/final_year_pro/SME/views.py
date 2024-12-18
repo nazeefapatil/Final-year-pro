@@ -4,18 +4,14 @@ from django.views.generic import ListView, DetailView, CreateView, UpdateView, D
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth import login, logout
 from django.urls import reverse_lazy
-from django.db.models import Q
+from django.db.models import Q, Sum, F
 from django.http import JsonResponse
 from django.core.paginator import Paginator
-from regex import F
-from .forms import BuyerSellerMatchForm
-from django.shortcuts import render, redirect
 from django.contrib.auth import login, authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from .forms import UserSignupForm, UserUpdateForm
 
-from sympy import Sum
 from .models import (
     User, Company, SellerProfile, SupplierProfile, RawMaterial,
     CompanyRequirement, SellerProduct, SupplierProduct, Order,
@@ -27,15 +23,16 @@ from .forms import (
     RawMaterialForm, CompanyRequirementForm, SellerProductForm, SupplierProductForm,
     OrderForm, ReviewForm, SupplierReviewForm, WhatsAppMessageForm, PhoneCallForm,
     EmailCommunicationForm, UserCommunicationPreferenceForm, ProductSearchForm,
-    AdvancedOrderForm, BulkRawMaterialUploadForm, DateRangeReportForm
+    AdvancedOrderForm, BulkRawMaterialUploadForm, DateRangeReportForm,
+    BuyerSellerMatchForm
 )
 import csv
 from io import TextIOWrapper
-from django.contrib import messages
 from django.utils import timezone
 from datetime import timedelta
 import logging
 logger = logging.getLogger(__name__)
+
 def home_view(request):
     """
     Render the home page.
@@ -50,10 +47,31 @@ def signup_view(request):
     if request.method == 'POST':
         form = UserSignupForm(request.POST, request.FILES)
         if form.is_valid():
-            user = form.save()
+            user = form.save(commit=False)  # Don't save yet to prevent signal from firing
+            user.save()  # Now save the user
+
+            # If user is a seller or supplier, create a company and profile
+            if user.role in ['seller', 'supplier']:
+                # Create a default company for the user
+                company = Company.objects.create(
+                    company_name=f"{user.username}'s Company",  # Default name
+                    email=user.email,  # Use user's email
+                )
+                
+                # Create the profile manually instead of using signal
+                if user.role == 'seller':
+                    SellerProfile.objects.create(user=user, company=company)
+                else:  # supplier
+                    SupplierProfile.objects.create(user=user, company=company)
+
             login(request, user)
             messages.success(request, 'Account created successfully!')
-            return redirect('profile')  # Redirect to user profile page
+            
+            # Redirect to company update page for sellers and suppliers
+            if user.role in ['seller', 'supplier']:
+                messages.info(request, 'Please update your company information.')
+                return redirect('company_update', pk=company.pk)
+            return redirect('profile')
         else:
             messages.error(request, 'Please correct the errors below.')
     else:
@@ -579,7 +597,7 @@ class DashboardView(LoginRequiredMixin, View):
     def seller_dashboard(self, request):
         recent_orders = Order.objects.filter(product__seller__user=request.user).order_by('-created_at')[:5]
         top_products = SellerProduct.objects.filter(seller__user=request.user).annotate(
-            total_ordered=Sum('orders__quantity_ordered')
+            total_ordered=Sum(F('orders__quantity_ordered'))
         ).order_by('-total_ordered')[:5]
         
         context = {
@@ -599,7 +617,9 @@ class DashboardView(LoginRequiredMixin, View):
     def admin_dashboard(self, request):
         recent_users = User.objects.order_by('-date_joined')[:10]
         recent_orders = Order.objects.order_by('-created_at')[:10]
-        total_sales = Order.objects.aggregate(total_sales=Sum(F('product__price_per_unit') * F('quantity_ordered')))['total_sales'] or 0
+        total_sales = Order.objects.aggregate(
+            total_sales=Sum(F('product__price_per_unit') * F('quantity_ordered'))
+        )['total_sales'] or 0
         
         context = {
             'recent_users': recent_users,
@@ -649,38 +669,64 @@ class BuyerSellerMatchListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         user = self.request.user
-        if user.role == 'buyer':
-            return BuyerSellerMatch.objects.filter(buyer_requirement__company__seller_profile__user=user)
-        elif user.role == 'seller':
-            return BuyerSellerMatch.objects.filter(seller_product__seller__user=user)
+        if user.role == 'seller':
+            # For sellers, show matches where their products match buyer requirements
+            return BuyerSellerMatch.objects.filter(
+                seller_product__seller__user=user
+            ).select_related(
+                'buyer_requirement__company',
+                'seller_product__material'
+            ).order_by('-match_date')
         else:
-            return BuyerSellerMatch.objects.none()
+            # For buyers, show matches where their requirements match seller products
+            return BuyerSellerMatch.objects.filter(
+                buyer_requirement__company=user.company
+            ).select_related(
+                'seller_product__seller__company',
+                'seller_product__material'
+            ).order_by('-match_date')
 
-class BuyerSellerMatchCreateView(LoginRequiredMixin, CreateView):
-    model = BuyerSellerMatch
-    form_class = BuyerSellerMatchForm
-    template_name = 'buyer_seller_match_form.html'
-    success_url = reverse_lazy('buyer_seller_match_list')
-
-    def form_valid(self, form):
-        if self.request.user.role == 'buyer':
-            form.instance.buyer_requirement.company = self.request.user.seller_profile.company
-        elif self.request.user.role == 'seller':
-            form.instance.seller_product.seller = self.request.user.seller_profile
-        return super().form_valid(form)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        
+        if user.role == 'seller':
+            # Add seller's products that haven't found matches
+            context['unmatched_products'] = SellerProduct.objects.filter(
+                seller__user=user
+            ).exclude(
+                matches__isnull=False
+            )
+        else:
+            # Add buyer's requirements that haven't found matches
+            context['unmatched_requirements'] = CompanyRequirement.objects.filter(
+                company=user.company
+            ).exclude(
+                matches__isnull=False
+            )
+        
+        return context
 
 class BuyerSellerMatchDetailView(LoginRequiredMixin, DetailView):
     model = BuyerSellerMatch
     template_name = 'buyer_seller_match_detail.html'
     context_object_name = 'match'
 
-class BuyerSellerMatchUpdateView(LoginRequiredMixin, UpdateView):
-    model = BuyerSellerMatch
-    form_class = BuyerSellerMatchForm
-    template_name = 'buyer_seller_match_form.html'
-    success_url = reverse_lazy('buyer_seller_match_list')
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'seller':
+            return BuyerSellerMatch.objects.filter(seller_product__seller__user=user)
+        else:
+            return BuyerSellerMatch.objects.filter(buyer_requirement__company=user.company)
 
 class BuyerSellerMatchDeleteView(LoginRequiredMixin, DeleteView):
     model = BuyerSellerMatch
     template_name = 'buyer_seller_match_confirm_delete.html'
     success_url = reverse_lazy('buyer_seller_match_list')
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'seller':
+            return BuyerSellerMatch.objects.filter(seller_product__seller__user=user)
+        else:
+            return BuyerSellerMatch.objects.filter(buyer_requirement__company=user.company)
