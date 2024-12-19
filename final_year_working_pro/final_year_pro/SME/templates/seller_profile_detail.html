@@ -1,10 +1,107 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<h2>Seller Profile</h2>
-<p>Username: {{ profile.user.username }}</p>
-<p>Company: {{ profile.company.company_name }}</p>
-<p>Address: {{ profile.address }}</p>
-<p>WhatsApp: {{ profile.whatsapp_number }}</p>
-<a href="{% url 'seller_profile_update' %}">Edit Profile</a>
+<div class="container mt-5">
+    <!-- Profile Info -->
+    <div class="card shadow mb-4">
+        <div class="card-header">
+            <h3 class="card-title mb-0">Seller Profile</h3>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Username:</strong> {{ profile.user.username }}</p>
+                    <p><strong>Company:</strong> {{ profile.company.company_name }}</p>
+                    <p><strong>Address:</strong> {{ profile.address|default:"Not provided" }}</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Email:</strong> {{ profile.user.email }}</p>
+                    <p><strong>WhatsApp:</strong> {{ profile.whatsapp_number|default:"Not provided" }}</p>
+                    <a href="{% url 'seller_profile_update' %}" class="btn btn-primary">
+                        <i class="fas fa-edit"></i> Edit Profile
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Products Section -->
+    <div class="card shadow">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h3 class="card-title mb-0">My Products</h3>
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addProductModal">
+                <i class="fas fa-plus"></i> Add New Product
+            </button>
+        </div>
+        <div class="card-body">
+            {% if seller_products %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Material</th>
+                                <th>Price/Unit</th>
+                                <th>Available Quantity</th>
+                                <th>Min. Order</th>
+                                <th>Available From</th>
+                                <th>Available Until</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for product in seller_products %}
+                            <tr>
+                                <td>{{ product.material.material_name }}</td>
+                                <td>₹{{ product.price_per_unit }}</td>
+                                <td>{{ product.quantity_available }}</td>
+                                <td>{{ product.minimum_order_quantity }}</td>
+                                <td>{{ product.available_from|date:"M d, Y" }}</td>
+                                <td>{{ product.available_until|date:"M d, Y" }}</td>
+                                <td>
+                                    <a href="#" class="btn btn-sm btn-info">Edit</a>
+                                    <button class="btn btn-sm btn-danger">Delete</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-info">
+                    You haven't added any products yet. Click the "Add New Product" button to get started.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Add Product Modal -->
+<div class="modal fade" id="addProductModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Product</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form method="post" action="{% url 'add_seller_product' %}" id="productForm">
+                    {% csrf_token %}
+                    {% for field in product_form %}
+                        <div class="mb-3">
+                            <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.errors %}
+                                <div class="invalid-feedback d-block">{{ field.errors }}</div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-primary">Add Product</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

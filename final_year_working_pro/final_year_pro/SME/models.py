@@ -145,7 +145,7 @@ class SellerProduct(models.Model):
     Represents products (raw materials) that sellers offer for sale.
     """
     seller = models.ForeignKey(SellerProfile, on_delete=models.CASCADE, related_name="products")
-    material = models.ForeignKey(RawMaterial, on_delete=models.CASCADE, related_name="offered_by")
+    material = models.ForeignKey(RawMaterial, on_delete=models.CASCADE, related_name="offered_by",default=1)
     price_per_unit = models.DecimalField(max_digits=10, decimal_places=2)
     quantity_available = models.DecimalField(max_digits=10, decimal_places=2)
     minimum_order_quantity = models.DecimalField(max_digits=10, decimal_places=2, default=1)

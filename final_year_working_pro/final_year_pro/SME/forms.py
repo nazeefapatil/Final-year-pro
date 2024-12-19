@@ -13,22 +13,30 @@ class UserSignupForm(UserCreationForm):
     """
     Custom signup form for creating new users with extended fields.
     """
+    role = forms.ChoiceField(
+        choices=User.USER_ROLES,
+        widget=forms.RadioSelect(attrs={'class': 'role-select'}),
+        label="I want to join as a"
+    )
+    email = forms.EmailField(required=True)
     phone = forms.CharField(
-        max_length=20, 
-        validators=[
-            RegexValidator(
-                r'^\+?1?\d{9,15}$', 
-                'Enter a valid phone number, including country code.'
-            )
-        ],
-        required=False,
-        help_text="Optional. Enter a valid phone number including country code."
+        max_length=20,
+        required=True,
+        widget=forms.TextInput(attrs={'placeholder': '+91XXXXXXXXXX'})
     )
     profile_picture = forms.ImageField(required=False)
 
     class Meta:
         model = User
-        fields = ['username', 'email', 'password1', 'password2', 'role', 'phone', 'profile_picture']
+        fields = ['username', 'email', 'phone', 'role', 'profile_picture', 'password1', 'password2']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields:
+            if field != 'role':
+                self.fields[field].widget.attrs.update({'class': 'form-control'})
+        self.fields['username'].widget.attrs.update({'placeholder': 'Choose a username'})
+        self.fields['email'].widget.attrs.update({'placeholder': 'Enter your email'})
 
     def clean_phone(self):
         phone = self.cleaned_data.get('phone')
@@ -194,3 +202,61 @@ class DateRangeReportForm(forms.Form):
                 raise forms.ValidationError("End date should be after start date.")
 
         return cleaned_data
+
+class CompanySignupForm(forms.ModelForm):
+    class Meta:
+        model = Company
+        fields = ['company_name', 'email', 'phone', 'address', 'country', 'website']
+        widgets = {
+            'company_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter company name'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Company email'}),
+            'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Company phone'}),
+            'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Company address'}),
+            'country': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Country'}),
+            'website': forms.URLInput(attrs={'class': 'form-control', 'placeholder': 'Company website (optional)'})
+        }
+
+class SellerProfileSignupForm(forms.ModelForm):
+    class Meta:
+        model = SellerProfile
+        fields = ['whatsapp_number']
+        widgets = {
+            'whatsapp_number': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'WhatsApp number for business communication'
+            })
+        }
+
+class SupplierProfileSignupForm(forms.ModelForm):
+    class Meta:
+        model = SupplierProfile
+        fields = ['whatsapp_number']
+        widgets = {
+            'whatsapp_number': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'WhatsApp number for business communication'
+            })
+        }
+
+class SellerProductInitialForm(forms.ModelForm):
+    class Meta:
+        model = SellerProduct
+        fields = ['material', 'price_per_unit', 'quantity_available', 'minimum_order_quantity', 'available_from', 'available_until']
+        widgets = {
+            'material': forms.Select(attrs={'class': 'form-control'}, choices=RawMaterial.objects.all()),
+            'price_per_unit': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Price per unit'}),
+            'quantity_available': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Available quantity'}),
+            'minimum_order_quantity': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Minimum order quantity'}),
+            'available_from': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'available_until': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'})
+        }
+
+class CompanyRequirementInitialForm(forms.ModelForm):
+    class Meta:
+        model = CompanyRequirement
+        fields = ['material', 'quantity_required', 'additional_details']
+        widgets = {
+            'material': forms.Select(attrs={'class': 'form-control'}),
+            'quantity_required': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Required quantity'}),
+            'additional_details': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Additional requirements or specifications'})
+        }

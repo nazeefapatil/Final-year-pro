@@ -10,7 +10,7 @@ from django.core.paginator import Paginator
 from django.contrib.auth import login, authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .forms import UserSignupForm, UserUpdateForm
+from .forms import UserSignupForm, UserUpdateForm, CompanySignupForm, SellerProfileSignupForm, SellerProductInitialForm, CompanyRequirementInitialForm, SupplierProfileSignupForm
 
 from .models import (
     User, Company, SellerProfile, SupplierProfile, RawMaterial,
@@ -42,41 +42,104 @@ def home_view(request):
 
 def signup_view(request):
     """
-    Handle user signup process.
+    Handle user signup process with role-specific information.
     """
     if request.method == 'POST':
         form = UserSignupForm(request.POST, request.FILES)
-        if form.is_valid():
-            user = form.save(commit=False)  # Don't save yet to prevent signal from firing
-            user.save()  # Now save the user
+        company_form = CompanySignupForm(request.POST)
+        seller_form = SellerProfileSignupForm(request.POST)
+        supplier_form = SupplierProfileSignupForm(request.POST)
+        buyer_requirement_form = CompanyRequirementInitialForm(request.POST)
+        
+        # Initialize forms_valid with user form validation
+        forms_valid = form.is_valid()
+        
+        # Validate company form for all roles
+        if forms_valid:
+            forms_valid = company_form.is_valid()
+        
+        # Check role-specific form validity
+        if forms_valid and form.cleaned_data.get('role'):
+            role = form.cleaned_data['role']
+            if role == 'seller':
+                forms_valid = seller_form.is_valid()
+            elif role == 'buyer':
+                forms_valid = buyer_requirement_form.is_valid()
+            elif role == 'supplier':
+                forms_valid = supplier_form.is_valid()
 
-            # If user is a seller or supplier, create a company and profile
-            if user.role in ['seller', 'supplier']:
-                # Create a default company for the user
-                company = Company.objects.create(
-                    company_name=f"{user.username}'s Company",  # Default name
-                    email=user.email,  # Use user's email
-                )
-                
-                # Create the profile manually instead of using signal
+        if forms_valid:
+            try:
+                # Create user
+                user = form.save(commit=False)
+                user.save()
+
+                # Create company
+                company = company_form.save(commit=False)
+                company.save()
+
+                # Handle role-specific profile creation
                 if user.role == 'seller':
-                    SellerProfile.objects.create(user=user, company=company)
-                else:  # supplier
-                    SupplierProfile.objects.create(user=user, company=company)
+                    seller_profile = seller_form.save(commit=False)
+                    seller_profile.user = user
+                    seller_profile.company = company
+                    seller_profile.save()
 
-            login(request, user)
-            messages.success(request, 'Account created successfully!')
-            
-            # Redirect to company update page for sellers and suppliers
-            if user.role in ['seller', 'supplier']:
-                messages.info(request, 'Please update your company information.')
-                return redirect('company_update', pk=company.pk)
-            return redirect('profile')
+                elif user.role == 'buyer':
+                    # Create buyer requirement
+                    requirement = buyer_requirement_form.save(commit=False)
+                    requirement.company = company
+                    requirement.save()
+
+                elif user.role == 'supplier':
+                    supplier_profile = supplier_form.save(commit=False)
+                    supplier_profile.user = user
+                    supplier_profile.company = company
+                    supplier_profile.save()
+
+                login(request, user)
+                messages.success(request, 'Account created successfully!')
+                return redirect('dashboard')
+                
+            except Exception as e:
+                # If any error occurs during save operations, delete the user and company
+                if 'user' in locals():
+                    user.delete()
+                if 'company' in locals():
+                    company.delete()
+                    
+                messages.error(request, f'An error occurred while creating your account. Please try again.')
+                logger.error(f'Error during signup: {str(e)}')
         else:
-            messages.error(request, 'Please correct the errors below.')
+            # Collect all form errors
+            all_errors = []
+            for form_name, form_obj in [
+                ('User', form),
+                ('Company', company_form),
+                ('Seller Profile', seller_form),
+                ('Requirement', buyer_requirement_form)
+            ]:
+                if form_obj.errors:
+                    all_errors.append(f'{form_name} errors: {", ".join([f"{field}: {error}" for field, errors in form_obj.errors.items() for error in errors])}')
+            
+            error_message = ' | '.join(all_errors)
+            messages.error(request, f'Please correct the following errors: {error_message}')
+            logger.warning(f'Form validation failed: {error_message}')
     else:
         form = UserSignupForm()
-    return render(request, 'signup.html', {'form': form})
+        company_form = CompanySignupForm()
+        seller_form = SellerProfileSignupForm()
+        buyer_requirement_form = CompanyRequirementInitialForm()
+        supplier_form = SupplierProfileSignupForm()
+
+    context = {
+        'form': form,
+        'company_form': company_form,
+        'seller_form': seller_form,
+        'supplier_form': supplier_form,
+        'buyer_requirement_form': buyer_requirement_form,
+    }
+    return render(request, 'signup.html', context)
 
 
 def login_view(request):
@@ -161,6 +224,12 @@ class SellerProfileDetailView(LoginRequiredMixin, DetailView):
     template_name = 'seller_profile_detail.html'
     context_object_name = 'profile'
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['seller_products'] = SellerProduct.objects.filter(seller__user=self.request.user)
+        context['product_form'] = SellerProductInitialForm()
+        return context
+
     def get_object(self):
         return get_object_or_404(SellerProfile, user=self.request.user)
 
@@ -173,8 +242,23 @@ class SellerProfileUpdateView(LoginRequiredMixin, UpdateView):
     def get_object(self):
         return get_object_or_404(SellerProfile, user=self.request.user)
 
-# Supplier Profile Views
+from django.contrib import messages
+from django.shortcuts import redirect
 
+def add_seller_product(request):
+    if request.method == 'POST':
+        form = SellerProductInitialForm(request.POST)
+        if form.is_valid():
+            product = form.save(commit=False)
+            product.seller = request.user.seller_profile
+            product.save()
+            messages.success(request, 'Product added successfully!')
+            return redirect('seller_profile')
+        else:
+            messages.error(request, 'Please correct the errors in the form.')
+    return redirect('seller_profile')
+
+# Supplier Profile Views
 class SupplierProfileDetailView(LoginRequiredMixin, DetailView):
     model = SupplierProfile
     template_name = 'supplier_profile_detail.html'
@@ -384,7 +468,7 @@ class EmailCommunicationCreateView(LoginRequiredMixin, CreateView):
     model = EmailCommunication
     form_class = EmailCommunicationForm
     template_name = 'email_communication_form.html'
-    success_url = reverse_lazy('email_sent')
+    success_url = reverse_lazy('profile')
 
     def form_valid(self, form):
         form.instance.sender = self.request.user

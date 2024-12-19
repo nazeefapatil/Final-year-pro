@@ -69,6 +69,7 @@ urlpatterns = [
     # Seller Product URLs
     path('seller-products/', views.SellerProductListView.as_view(), name='seller_product_list'),
     path('seller-products/create/', views.SellerProductCreateView.as_view(), name='seller_product_create'),
+    path('seller-profile/add-product/', views.add_seller_product, name='add_seller_product'),
 
     # Supplier Product URLs
     path('supplier-products/', views.SupplierProductListView.as_view(), name='supplier_product_list'),
